@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NE FAIS PAS LE GESTE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #0f172a;
+        }
+        .pixelated {
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white min-h-screen flex flex-col items-center justify-between p-4 overflow-x-hidden">
+
+    <header class="w-full max-w-md flex justify-between items-center py-2 px-4 bg-slate-800/80 backdrop-blur border border-slate-700/50 rounded-2xl shadow-lg">
+        <div class="flex items-center gap-2">
+            <span class="text-amber-400 text-xl">🏆</span>
+            <span id="score-display" class="font-bold text-lg tracking-wider">0</span>
+        </div>
+        <h1 class="text-xs sm:text-sm font-extrabold tracking-widest text-slate-300">NE FAIS PAS LE GESTE</h1>
+        <div class="flex items-center gap-2">
+            <span class="text-emerald-400 text-sm font-semibold">Niv. <span id="level-display">1</span>/30</span>
+        </div>
+    </header>
+
+    <main class="w-full max-w-md my-4 flex flex-col items-center">
+        <div id="game-card" class="relative w-full aspect-[4/5] max-h-[550px] bg-gradient-to-b from-slate-800 to-slate-900 border-2 border-slate-700 rounded-3xl overflow-hidden shadow-2xl flex flex-col items-center justify-center cursor-pointer select-none">
+            
+            <canvas id="gameCanvas" class="w-full h-full block absolute inset-0"></canvas>
+
+            <div id="overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-20 transition-all duration-300 overflow-y-auto">
+                <h2 id="overlay-title" class="text-2xl font-black mb-4 text-white tracking-wide">NE FAIS PAS LE GESTE</h2>
+                
+                <!-- Formulaire de saisie du pseudo (affiché en fin de partie) -->
+                <div id="score-form" class="hidden flex-col gap-3 w-full max-w-xs mb-4">
+                    <input type="text" id="player-name" placeholder="Votre pseudo" maxlength="15" class="bg-slate-800 border border-slate-700 text-white px-4 py-2 rounded-xl text-center font-bold focus:outline-none focus:border-emerald-500">
+                    <button id="save-score-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl transition-all text-sm">Enregistrer mon score</button>
+                </div>
+
+                <!-- Tableau des 10 meilleurs scores -->
+                <div id="leaderboard-container" class="w-full max-w-xs bg-slate-900/60 border border-slate-800 rounded-2xl p-3 mb-4 text-left">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">Top 10 des Légendes</h3>
+                    <div id="leaderboard-list" class="space-y-1 text-xs text-slate-300 max-h-32 overflow-y-auto pr-1">
+                        <div class="text-center text-slate-500 italic py-2">Chargement...</div>
+                    </div>
+                </div>
+
+                <button id="action-btn" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-bold px-8 py-3 rounded-2xl shadow-xl shadow-emerald-900/40 text-base transition-all flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <span>JOUER</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="w-full mt-4 px-2 flex flex-col items-center gap-2">
+            <div class="w-full flex items-center justify-between text-xs text-slate-400 font-medium">
+                <span>Vitesse du bras</span>
+                <span id="speed-text">1.0x</span>
+            </div>
+            <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700/50">
+                <div id="speed-bar" class="h-full bg-gradient-to-r from-emerald-500 via-amber-500 to-red-500 transition-all duration-300" style="width: 3.33%;"></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="w-full max-w-md text-center py-2"></footer>
+
+    <script>
+        // REMPLACEZ CETTE URL par l'URL de votre Worker Cloudflare une fois déployé (ex: https://mon-jeu-score.nom.workers.dev)
+        const API_URL = "VOTRE_URL_CLOUDFLARE_WORKER_ICI";
+
+        let currentLevel = 1;
+        let score = 0;
+        let gameState = 'IDLE'; 
+        let angle = 0; 
+        let baseSpeed = 0.03; 
+        let currentSpeed = 0.03;
+        let animationFrameId = null;
+
+        const soldierImg = new Image();
+        soldierImg.crossOrigin = "anonymous";
+        soldierImg.src = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69720c7e2ddc34516a0b062a/1dfade5a1_nouveausoldatproportionnel.png";
+
+        const armImg = new Image();
+        armImg.crossOrigin = "anonymous";
+        armImg.src = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69720c7e2ddc34516a0b062a/a5427e7fb_Nouveaubrasdusoldat.png";
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const overlayTitle = document.getElementById('overlay-title');
+        const actionBtn = document.getElementById('action-btn');
+        const levelDisplay = document.getElementById('level-display');
+        const scoreDisplay = document.getElementById('score-display');
+        const speedText = document.getElementById('speed-text');
+        const speedBar = document.getElementById('speed-bar');
+        const gameCard = document.getElementById('game-card');
+        const scoreForm = document.getElementById('score-form');
+        const playerNameInput = document.getElementById('player-name');
+        const saveScoreBtn = document.getElementById('save-score-btn');
+        const leaderboardList = document.getElementById('leaderboard-list');
+
+        async function fetchLeaderboard() {
+            try {
+                const res = await fetch(`${API_URL}/scores`);
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    leaderboardList.innerHTML = data.map((item, index) => `
+                        <div class="flex justify-between items-center py-0.5 px-2 rounded ${index === 0 ? 'bg-amber-500/20 text-amber-300 font-bold' : index === 1 ? 'bg-slate-700/40 text-slate-200' : index === 2 ? 'bg-amber-900/20 text-amber-600' : ''}">
+                            <span>#${index + 1} ${escapeHtml(item.name)}</span>
+                            <span class="font-mono">${item.score} pts</span>
+                        </div>
+                    `).join('');
+                } else {
+                    leaderboardList.innerHTML = '<div class="text-center text-slate-500 italic py-2">Aucun score pour l\'instant</div>';
+                }
+            } catch (e) {
+                leaderboardList.innerHTML = '<div class="text-center text-red-400 italic py-2">Erreur de chargement</div>';
+            }
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        saveScoreBtn.addEventListener('click', async () => {
+            const name = playerNameInput.value.trim() || "Anonyme";
+            saveScoreBtn.disabled = true;
+            saveScoreBtn.textContent = "Enregistrement...";
+            try {
+                await fetch(`${API_URL}/scores`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, score })
+                });
+                scoreForm.classList.add('hidden');
+                fetchLeaderboard();
+            } catch (e) {
+                saveScoreBtn.disabled = false;
+                saveScoreBtn.textContent = "Erreur, réessayer";
+            }
+        });
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            drawScene();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function getClockHour(rad) {
+            let normAngle = rad % (Math.PI * 2);
+            if (normAngle < 0) normAngle += Math.PI * 2;
+            let clockRad = normAngle + Math.PI / 2;
+            if (clockRad < 0) clockRad += Math.PI * 2;
+            if (clockRad >= Math.PI * 2) clockRad -= Math.PI * 2;
+            return (clockRad / (Math.PI * 2)) * 12;
+        }
+
+        function drawScene() {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            ctx.clearRect(0, 0, width, height);
+            const centerX = width / 2;
+            const centerY = height / 2 + 10;
+            ctx.save();
+
+            if (soldierImg.complete && soldierImg.naturalWidth !== 0) {
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(soldierImg, centerX - 70, centerY - 115, 140, 230);
+            }
+
+            if (armImg.complete && armImg.naturalWidth !== 0) {
+                ctx.imageSmoothingEnabled = false;
+                ctx.save();
+                ctx.translate(centerX - -4, centerY);
+                ctx.rotate(angle);
+                ctx.drawImage(armImg, -2, -9 + 1, 62, 18);
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        function update() {
+            if (gameState === 'PLAYING') {
+                currentSpeed = baseSpeed * Math.pow(1.10, currentLevel - 1);
+                angle += currentSpeed;
+                drawScene();
+                animationFrameId = requestAnimationFrame(update);
+            }
+        }
+
+        function startLevel() {
+            gameState = 'PLAYING';
+            angle = Math.random() * Math.PI * 2;
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+            scoreForm.classList.add('hidden');
+            
+            const speedMultiplier = Math.pow(1.10, currentLevel - 1).toFixed(1);
+            speedText.textContent = `${speedMultiplier}x`;
+            speedBar.style.width = `${Math.min(100, (currentLevel / 30) * 100)}%`;
+
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(update);
+        }
+
+        function handlePlayerAction(e) {
+            if (e) e.preventDefault();
+            if (gameState !== 'PLAYING') return;
+
+            gameState = 'STOPPED';
+            cancelAnimationFrame(animationFrameId);
+
+            const stoppedHour = getClockHour(angle);
+            const isLoss = (stoppedHour >= 0.75 && stoppedHour <= 2.75);
+
+            if (isLoss) {
+                const finalScore = score;
+                score = 0;
+                currentLevel = 1;
+                scoreDisplay.textContent = score;
+                levelDisplay.textContent = currentLevel;
+
+                overlayTitle.textContent = 'PERDU !';
+                overlayTitle.className = 'text-2xl font-black mb-3 text-red-400 tracking-wide';
+                
+                if (finalScore > 0) {
+                    scoreForm.classList.remove('hidden');
+                    saveScoreBtn.disabled = false;
+                    saveScoreBtn.textContent = "Enregistrer mon score";
+                }
+                
+                actionBtn.innerHTML = `<span>RÉESSAYER (NIVEAU 1)</span>`;
+                actionBtn.className = 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 active:scale-95 text-white font-bold px-8 py-3 rounded-2xl shadow-xl shadow-red-900/40 text-base transition-all flex items-center gap-3';
+                overlay.classList.remove('opacity-0', 'pointer-events-none');
+                gameState = 'GAMEOVER';
+                fetchLeaderboard();
+            } else {
+                score += currentLevel * 100;
+                scoreDisplay.textContent = score;
+
+                if (currentLevel >= 30) {
+                    overlayTitle.textContent = 'VICTOIRE ULTIME !';
+                    overlayTitle.className = 'text-2xl font-black mb-3 text-amber-400 tracking-wide';
+                    scoreForm.classList.remove('hidden');
+                    saveScoreBtn.disabled = false;
+                    saveScoreBtn.textContent = "Enregistrer mon score";
+                    
+                    actionBtn.innerHTML = `<span>REJOUER DEPUIS LE NIVEAU 1</span>`;
+                    actionBtn.className = 'bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 active:scale-95 text-white font-bold px-8 py-3 rounded-2xl shadow-xl shadow-amber-900/40 text-base transition-all flex items-center gap-3';
+                    overlay.classList.remove('opacity-0', 'pointer-events-none');
+                    gameState = 'VICTORY';
+                    fetchLeaderboard();
+                } else {
+                    currentLevel++;
+                    levelDisplay.textContent = currentLevel;
+
+                    overlayTitle.textContent = 'BIEN JOUÉ !';
+                    overlayTitle.className = 'text-2xl font-black mb-3 text-emerald-400 tracking-wide';
+                    actionBtn.innerHTML = `<span>NIVEAU SUIVANT (${currentLevel})</span>`;
+                    actionBtn.className = 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-bold px-8 py-3 rounded-2xl shadow-xl shadow-emerald-900/40 text-base transition-all flex items-center gap-3';
+                    overlay.classList.remove('opacity-0', 'pointer-events-none');
+                    gameState = 'IDLE';
+                }
+            }
+        }
+
+        gameCard.addEventListener('click', (e) => { if (gameState === 'PLAYING') handlePlayerAction(e); });
+        gameCard.addEventListener('touchend', (e) => { if (gameState === 'PLAYING') handlePlayerAction(e); }, { passive: false });
+
+        actionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (gameState === 'VICTORY' || gameState === 'GAMEOVER') {
+                currentLevel = 1;
+                score = 0;
+                scoreDisplay.textContent = score;
+                levelDisplay.textContent = currentLevel;
+            }
+            if (gameState === 'VICTORY' || gameState === 'GAMEOVER' || gameState === 'IDLE') {
+                overlayTitle.className = 'text-2xl font-black mb-4 text-white tracking-wide';
+                overlayTitle.textContent = 'NE FAIS PAS LE GESTE';
+                actionBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>JOUER</span>`;
+                actionBtn.className = 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-bold px-8 py-3 rounded-2xl shadow-xl shadow-emerald-900/40 text-base transition-all flex items-center gap-3';
+                startLevel();
+            }
+        });
+
+        window.onload = () => {
+            resizeCanvas();
+            soldierImg.onload = drawScene;
+            armImg.onload = drawScene;
+            drawScene();
+            fetchLeaderboard();
+        };
+    </script>
+</body>
+</html>
