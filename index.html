@@ -29,6 +29,14 @@
         .pixelated {
             image-rendering: pixelated;
         }
+        @keyframes bounceIn {
+            0% { transform: scale(0.85); opacity: 0; }
+            70% { transform: scale(1.03); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-bounce-in {
+            animation: bounceIn 0.3s ease forwards;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white min-h-screen flex flex-col items-center justify-between p-4 overflow-x-hidden">
@@ -38,7 +46,12 @@
             <span class="text-amber-400 text-xl">🏆</span>
             <span id="score-display" class="font-bold text-lg tracking-wider">0</span>
         </div>
-        <h1 class="text-xs sm:text-sm font-extrabold tracking-widest text-slate-300">NE FAIS PAS LE GESTE</h1>
+        <div class="flex flex-col items-center">
+            <h1 class="text-xs sm:text-sm font-extrabold tracking-widest text-slate-300">NE FAIS PAS LE GESTE</h1>
+            <button onclick="openModalLeaderboard()" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold underline transition-colors cursor-pointer">
+                🏆 Top 10 des scores
+            </button>
+        </div>
         <div class="flex items-center gap-2">
             <span class="text-emerald-400 text-sm font-semibold">Niv. <span id="level-display">1</span>/30</span>
         </div>
@@ -58,7 +71,7 @@
                     <button id="save-score-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl transition-all text-sm">Enregistrer mon score</button>
                 </div>
 
-                <!-- Tableau des 10 meilleurs scores -->
+                <!-- Tableau des 10 meilleurs scores (intégré dans l'overlay de fin de partie) -->
                 <div id="leaderboard-container" class="w-full max-w-xs bg-slate-900/60 border border-slate-800 rounded-2xl p-3 mb-4 text-left">
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">Top 10 des Légendes</h3>
                     <div id="leaderboard-list" class="space-y-1 text-xs text-slate-300 max-h-32 overflow-y-auto pr-1">
@@ -83,6 +96,24 @@
             </div>
         </div>
     </main>
+
+    <!-- FENÊTRE MODALE DU TOP 10 (ACCESSIBLE DEPUIS L'EN-TÊTE) -->
+    <div id="leaderboard-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="closeModalLeaderboard()">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl text-left animate-bounce-in" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <span>🏆</span> Top 10 des Légendes
+                </h3>
+                <button onclick="closeModalLeaderboard()" class="text-slate-400 hover:text-white text-2xl font-bold leading-none cursor-pointer">&times;</button>
+            </div>
+            <div id="modal-leaderboard-list" class="space-y-1.5 text-xs text-slate-300 max-h-64 overflow-y-auto pr-1 mb-4">
+                <div class="text-center text-slate-500 italic py-4">Chargement...</div>
+            </div>
+            <button onclick="closeModalLeaderboard()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-lg shadow-indigo-950/50 cursor-pointer">
+                Fermer
+            </button>
+        </div>
+    </div>
 
     <footer class="w-full max-w-md text-center py-2"></footer>
 
@@ -120,24 +151,43 @@
         const saveScoreBtn = document.getElementById('save-score-btn');
         const leaderboardContainer = document.getElementById('leaderboard-container');
         const leaderboardList = document.getElementById('leaderboard-list');
+        const leaderboardModal = document.getElementById('leaderboard-modal');
+        const modalLeaderboardList = document.getElementById('modal-leaderboard-list');
+
+        function formatLeaderboardHTML(data) {
+            if (!data || data.length === 0) {
+                return '<div class="text-center text-slate-500 italic py-2">Aucun score pour l\'instant</div>';
+            }
+            return data.map((item, index) => `
+                <div class="flex justify-between items-center py-1 px-2.5 rounded ${index === 0 ? 'bg-amber-500/20 text-amber-300 font-bold border-l-2 border-amber-400' : index === 1 ? 'bg-slate-800/80 text-slate-200 border-l-2 border-slate-400' : index === 2 ? 'bg-amber-900/20 text-amber-500 border-l-2 border-amber-700' : 'bg-slate-800/40 text-slate-300'}">
+                    <span>#${index + 1} ${escapeHtml(item.name)}</span>
+                    <span class="font-mono">${item.score} pts</span>
+                </div>
+            `).join('');
+        }
 
         async function fetchLeaderboard() {
             try {
                 const res = await fetch(API_URL);
                 const data = await res.json();
-                if (data && data.length > 0) {
-                    leaderboardList.innerHTML = data.map((item, index) => `
-                        <div class="flex justify-between items-center py-0.5 px-2 rounded ${index === 0 ? 'bg-amber-500/20 text-amber-300 font-bold' : index === 1 ? 'bg-slate-700/40 text-slate-200' : index === 2 ? 'bg-amber-900/20 text-amber-600' : ''}">
-                            <span>#${index + 1} ${escapeHtml(item.name)}</span>
-                            <span class="font-mono">${item.score} pts</span>
-                        </div>
-                    `).join('');
-                } else {
-                    leaderboardList.innerHTML = '<div class="text-center text-slate-500 italic py-2">Aucun score pour l\'instant</div>';
-                }
+                const html = formatLeaderboardHTML(data);
+                leaderboardList.innerHTML = html;
+                modalLeaderboardList.innerHTML = html;
             } catch (e) {
-                leaderboardList.innerHTML = '<div class="text-center text-red-400 italic py-2">Erreur de chargement</div>';
+                const errHTML = '<div class="text-center text-red-400 italic py-2">Erreur de chargement</div>';
+                leaderboardList.innerHTML = errHTML;
+                modalLeaderboardList.innerHTML = errHTML;
             }
+        }
+
+        function openModalLeaderboard() {
+            modalLeaderboardList.innerHTML = '<div class="text-center text-slate-500 italic py-4">Chargement...</div>';
+            leaderboardModal.classList.remove('hidden');
+            fetchLeaderboard();
+        }
+
+        function closeModalLeaderboard() {
+            leaderboardModal.classList.add('hidden');
         }
 
         function escapeHtml(str) {
@@ -276,7 +326,6 @@
                     overlayTitle.textContent = 'BIEN JOUÉ !';
                     overlayTitle.className = 'text-2xl font-black mb-6 text-emerald-400 tracking-wide';
                     
-                    // Masque le formulaire et le classement entre les niveaux
                     scoreForm.classList.add('hidden');
                     leaderboardContainer.classList.add('hidden');
 
