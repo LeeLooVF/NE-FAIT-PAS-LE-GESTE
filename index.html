@@ -87,11 +87,11 @@
     <footer class="w-full max-w-md text-center py-2"></footer>
 
     <script>
-        // URL de votre Worker Cloudflare dédié
         const API_URL = "https://api-ne-fais-pas-le-geste.kjh27r4i-70a.workers.dev";
 
         let currentLevel = 1;
         let score = 0;
+        let lastScoreToSave = 0; // Sauvegarde du score avant réinitialisation
         let gameState = 'IDLE'; 
         let angle = 0; 
         let baseSpeed = 0.03; 
@@ -152,7 +152,7 @@
                 await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, score })
+                    body: JSON.stringify({ name, score: lastScoreToSave })
                 });
                 scoreForm.classList.add('hidden');
                 fetchLeaderboard();
@@ -238,7 +238,7 @@
             const isLoss = (stoppedHour >= 0.75 && stoppedHour <= 2.75);
 
             if (isLoss) {
-                const finalScore = score;
+                lastScoreToSave = score; // On garde le vrai score avant le reset
                 score = 0;
                 currentLevel = 1;
                 scoreDisplay.textContent = score;
@@ -247,11 +247,9 @@
                 overlayTitle.textContent = 'PERDU !';
                 overlayTitle.className = 'text-2xl font-black mb-3 text-red-400 tracking-wide';
                 
-                if (finalScore > 0) {
-                    scoreForm.classList.remove('hidden');
-                    saveScoreBtn.disabled = false;
-                    saveScoreBtn.textContent = "Enregistrer mon score";
-                }
+                scoreForm.classList.remove('hidden');
+                saveScoreBtn.disabled = false;
+                saveScoreBtn.textContent = "Enregistrer mon score";
                 
                 actionBtn.innerHTML = `<span>RÉESSAYER (NIVEAU 1)</span>`;
                 actionBtn.className = 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 active:scale-95 text-white font-bold px-8 py-3 rounded-2xl shadow-xl shadow-red-900/40 text-base transition-all flex items-center gap-3';
@@ -263,6 +261,7 @@
                 scoreDisplay.textContent = score;
 
                 if (currentLevel >= 30) {
+                    lastScoreToSave = score; // On garde le score maximal
                     overlayTitle.textContent = 'VICTOIRE ULTIME !';
                     overlayTitle.className = 'text-2xl font-black mb-3 text-amber-400 tracking-wide';
                     scoreForm.classList.remove('hidden');
