@@ -87,8 +87,8 @@
     <footer class="w-full max-w-md text-center py-2"></footer>
 
     <script>
-        // REMPLACEZ CETTE URL par l'URL de votre Worker Cloudflare une fois déployé (ex: https://mon-jeu-score.nom.workers.dev)
-        const API_URL = "VOTRE_URL_CLOUDFLARE_WORKER_ICI";
+        // URL de votre Worker Cloudflare dédié
+        const API_URL = "https://api-ne-fais-pas-le-geste.kjh27r4i-70a.workers.dev";
 
         let currentLevel = 1;
         let score = 0;
@@ -123,7 +123,7 @@
 
         async function fetchLeaderboard() {
             try {
-                const res = await fetch(`${API_URL}/scores`);
+                const res = await fetch(API_URL);
                 const data = await res.json();
                 if (data && data.length > 0) {
                     leaderboardList.innerHTML = data.map((item, index) => `
@@ -149,7 +149,7 @@
             saveScoreBtn.disabled = true;
             saveScoreBtn.textContent = "Enregistrement...";
             try {
-                await fetch(`${API_URL}/scores`, {
+                await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, score })
