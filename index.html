@@ -91,7 +91,6 @@
 
         let currentLevel = 1;
         let score = 0;
-        let lastScoreToSave = 0; // Sauvegarde du score avant réinitialisation
         let gameState = 'IDLE'; 
         let angle = 0; 
         let baseSpeed = 0.03; 
@@ -152,7 +151,7 @@
                 await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, score: lastScoreToSave })
+                    body: JSON.stringify({ name, score }) // Envoie la valeur exacte conservée
                 });
                 scoreForm.classList.add('hidden');
                 fetchLeaderboard();
@@ -238,15 +237,11 @@
             const isLoss = (stoppedHour >= 0.75 && stoppedHour <= 2.75);
 
             if (isLoss) {
-                lastScoreToSave = score; // On garde le vrai score avant le reset
-                score = 0;
-                currentLevel = 1;
-                scoreDisplay.textContent = score;
-                levelDisplay.textContent = currentLevel;
-
+                // On NE remet PAS score à 0 ici : on garde l'affichage visible en haut
                 overlayTitle.textContent = 'PERDU !';
                 overlayTitle.className = 'text-2xl font-black mb-3 text-red-400 tracking-wide';
                 
+                // Formulaire toujours proposé
                 scoreForm.classList.remove('hidden');
                 saveScoreBtn.disabled = false;
                 saveScoreBtn.textContent = "Enregistrer mon score";
@@ -261,7 +256,6 @@
                 scoreDisplay.textContent = score;
 
                 if (currentLevel >= 30) {
-                    lastScoreToSave = score; // On garde le score maximal
                     overlayTitle.textContent = 'VICTOIRE ULTIME !';
                     overlayTitle.className = 'text-2xl font-black mb-3 text-amber-400 tracking-wide';
                     scoreForm.classList.remove('hidden');
@@ -292,6 +286,7 @@
 
         actionBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            // La réinitialisation du score et du niveau se fait ici uniquement
             if (gameState === 'VICTORY' || gameState === 'GAMEOVER') {
                 currentLevel = 1;
                 score = 0;
