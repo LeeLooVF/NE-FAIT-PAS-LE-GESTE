@@ -118,6 +118,7 @@
         const scoreForm = document.getElementById('score-form');
         const playerNameInput = document.getElementById('player-name');
         const saveScoreBtn = document.getElementById('save-score-btn');
+        const leaderboardContainer = document.getElementById('leaderboard-container');
         const leaderboardList = document.getElementById('leaderboard-list');
 
         async function fetchLeaderboard() {
@@ -151,9 +152,10 @@
                 await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, score }) // Envoie la valeur exacte conservée
+                    body: JSON.stringify({ name, score })
                 });
                 scoreForm.classList.add('hidden');
+                leaderboardContainer.classList.remove('hidden');
                 fetchLeaderboard();
             } catch (e) {
                 saveScoreBtn.disabled = false;
@@ -237,12 +239,11 @@
             const isLoss = (stoppedHour >= 0.75 && stoppedHour <= 2.75);
 
             if (isLoss) {
-                // On NE remet PAS score à 0 ici : on garde l'affichage visible en haut
                 overlayTitle.textContent = 'PERDU !';
                 overlayTitle.className = 'text-2xl font-black mb-3 text-red-400 tracking-wide';
                 
-                // Formulaire toujours proposé
                 scoreForm.classList.remove('hidden');
+                leaderboardContainer.classList.remove('hidden');
                 saveScoreBtn.disabled = false;
                 saveScoreBtn.textContent = "Enregistrer mon score";
                 
@@ -259,6 +260,7 @@
                     overlayTitle.textContent = 'VICTOIRE ULTIME !';
                     overlayTitle.className = 'text-2xl font-black mb-3 text-amber-400 tracking-wide';
                     scoreForm.classList.remove('hidden');
+                    leaderboardContainer.classList.remove('hidden');
                     saveScoreBtn.disabled = false;
                     saveScoreBtn.textContent = "Enregistrer mon score";
                     
@@ -272,9 +274,14 @@
                     levelDisplay.textContent = currentLevel;
 
                     overlayTitle.textContent = 'BIEN JOUÉ !';
-                    overlayTitle.className = 'text-2xl font-black mb-3 text-emerald-400 tracking-wide';
+                    overlayTitle.className = 'text-2xl font-black mb-6 text-emerald-400 tracking-wide';
+                    
+                    // Masque le formulaire et le classement entre les niveaux
+                    scoreForm.classList.add('hidden');
+                    leaderboardContainer.classList.add('hidden');
+
                     actionBtn.innerHTML = `<span>NIVEAU SUIVANT (${currentLevel})</span>`;
-                    actionBtn.className = 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-bold px-8 py-3 rounded-2xl shadow-xl shadow-emerald-900/40 text-base transition-all flex items-center gap-3';
+                    actionBtn.className = 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-bold px-8 py-4 rounded-2xl shadow-xl shadow-emerald-900/40 text-lg transition-all flex items-center gap-3';
                     overlay.classList.remove('opacity-0', 'pointer-events-none');
                     gameState = 'IDLE';
                 }
@@ -286,7 +293,6 @@
 
         actionBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            // La réinitialisation du score et du niveau se fait ici uniquement
             if (gameState === 'VICTORY' || gameState === 'GAMEOVER') {
                 currentLevel = 1;
                 score = 0;
@@ -296,6 +302,7 @@
             if (gameState === 'VICTORY' || gameState === 'GAMEOVER' || gameState === 'IDLE') {
                 overlayTitle.className = 'text-2xl font-black mb-4 text-white tracking-wide';
                 overlayTitle.textContent = 'NE FAIS PAS LE GESTE';
+                leaderboardContainer.classList.remove('hidden');
                 actionBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>JOUER</span>`;
                 actionBtn.className = 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-bold px-8 py-3 rounded-2xl shadow-xl shadow-emerald-900/40 text-base transition-all flex items-center gap-3';
                 startLevel();
